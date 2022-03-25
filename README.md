@@ -16,10 +16,9 @@ git submodule add https://github.com/bats-core/bats-core.git test/bats
 git submodule add https://github.com/bats-core/bats-support.git test/test_helper/bats-support
 git submodule add https://github.com/bats-core/bats-assert.git test/test_helper/bats-assert
 git submodule add https://github.com/bats-core/bats-file test/test_helper/bats-file
-git submodule https://github.com/lox/bats-mock test/test_helper/bats-mock
 ```
 
-*The two last submodules here above (`bats-file` and `bats-mock` f.i.) are not mandatory but enhanced the feature of bats like allowing to check the existence of files/folders and to use mock feature.*
+*The last submodule here above (`bats-file`) is not mandatory but enhanced the feature of bats like allowing to check the existence of files/folders.*
 
 ### Using Docker
 
@@ -32,7 +31,6 @@ mkdir -p /opt/bats-test-helpers
 git clone https://github.com/ztombol/bats-support test/test_helper/bats-support
 git clone https://github.com/ztombol/bats-assert test/test_helper/bats-assert
 git clone https://github.com/bats-core/bats-file test/test_helper/bats-file
-git clone https://github.com/lox/bats-mock test/test_helper/bats-mock
 
 WORKDIR /code/
 ```
@@ -133,13 +131,72 @@ docker run -it -v ${PWD}:/code my/bats /code/test/test.bats
 
 ## Mocking
 
-[https://github.com/dodie/testing-in-bash/tree/master/example-bats#mocking](https://github.com/dodie/testing-in-bash/tree/master/example-bats#mocking)
+We can override a function during a test. Consider the following use case: we've a function that will return `0` when a give Docker image is present on the host. The function will return `1` and echo an error on the console if the image isn't retrieved.
 
-Mocking is possible with all [three common techniques](https://github.com/dodie/testing-in-bash/tree/master/mocking):
+```bash
+function assert::dockerImageExists() {
+    local image="${1}"
+    local msg="${2:-The Docker image \"$image\" did not exists}"
 
-* alias
-* function export
-* PATH override
+    # When the image exists, "docker images -q" will return his ID (f.i. `5eed474112e9`), an empty string otherwise
+    [[ "$(docker images -q "$image" 2>/dev/null)" == "" ]] && echo "$msg" && exit 1
+
+    return 0
+}
+```
+
+So, we need to *override* the docker answer. When the image is supposed to be there, we just need to return a non-empty string, anything but not an empty string. Let's return a fake ID to really simulate the answer of `docker images -q`.
+
+
+```bats
+@test "Assert docker image exists" {
+    # Mock - we'll create a very simple docker override and return a fake ID
+    # This will simulate the `docker images -q "AN_IMAGE_NAME"` which return
+    # the ID of the image when found
+    docker() {
+        echo "feb5d9fea6a5"
+    }
+
+    source assert.sh
+    run assert::dockerImageExists "A-great-Docker-Image"
+    assert_output "" # No output when success
+    assert_success
+}
+```
+
+And return an empty string to simulate an inexisting image.
+
+```bats
+@test "Assert docker image didn't exists" {
+    # Mock - we'll create a very simple docker override and return a fake ID
+    # This will simulate the `docker images -q "AN_IMAGE_NAME"` which return
+    # the ID of the image when found; here return an empty string to simulate
+    # an inexisting image
+    docker() {
+        echo ""
+    }
+
+    source assert.sh
+    run assert::dockerImageExists "Fake/image" "Bad choice, that image didn't exists"
+    assert_output --partial "Bad choice, that image didn't exists"
+    assert_failure
+}
+```
+
+Run the test
+
+```bash
+clear ; ./test/bats/bin/bats test/assert.bats --filter "Assert docker"
+```
+
+And we'll get this:
+
+```text
+✓ Assert docker image exists
+✓ Assert docker image didn't exists
+
+2 tests, 0 failures
+```
 
 
 ## Additional ressources:
