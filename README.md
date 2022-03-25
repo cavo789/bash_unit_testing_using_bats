@@ -199,9 +199,24 @@ And we'll get this:
 ```
 
 
+## Special cases
+
+### The test must always fail
+
+>[https://github.com/ztombol/bats-support#fail](https://github.com/ztombol/bats-support#fail)
+
+If a test should always fail (for instance because it's not yet correctly coded); use the `fail´ verb:
+
+```bats
+@test 'fail()' {
+  fail 'this test always fails'
+}
+```
+
 ## Additional ressources:
 
 * [Bats Official documenation](https://bats-core.readthedocs.io/en/stable/)
+* [https://github.com/dodie/testing-in-bash](https://github.com/dodie/testing-in-bash)
 * [https://github.com/bats-core](https://github.com/bats-core)
 * [https://github.com/dodie/testing-in-bash](https://github.com/dodie/testing-in-bash)
 * [https://marck-oemar.medium.com/unusual-unit-testing-part-1-bash-scripts-with-bats-55ac78e61491](https://marck-oemar.medium.com/unusual-unit-testing-part-1-bash-scripts-with-bats-55ac78e61491) / [https://github.com/marck-oemar/unittesting](https://github.com/marck-oemar/unittesting)
