@@ -93,6 +93,225 @@ setup() {
 }
 ```
 
+### Somes examples
+
+#### assert_equal
+
+Simply verify that both values are equals. Here, we'll call a function that will return the lenght of an array and verify it's the expected value.
+
+```bats
+@test "array::length - Calculate the length of an array" {
+    arr=("one" "two" "three" "four" "five")
+
+    assert_equal $(array::length arr) 5
+}
+```
+
+```bash
+function array::length() {
+    local -n array_length=$1
+    echo ${#array_length[@]}
+}
+```
+
+#### assert_failure
+
+`assert::binaryExists` will exit `1` if the binary can't be retrieved. An error message like `The binary can't be found` will be echoed on the console. 
+
+```bats
+@test "Assert binary didn't exists" {
+    # Simulate which and return an error meaning "No, that binary didn't exists on the host"
+    which() {
+        exit 1
+    }
+
+    run assert::binaryExists "Inexisting_Binary" "Ouch, no, no, that binary didn't exists on the system"
+    assert_output --partial "Ouch, no, no, that binary didn't exists on the system"
+    assert_failure
+}
+```
+
+```bash
+function assert::binaryExists() {
+    local binary="${1}"
+    local msg="${2:-${FUNCNAME[0]} - File \"$binary\" did not exists}"
+
+    [[ -z "$(which "$binary" || true)" ]] && echo "$msg" && exit 1
+
+    return 0
+}
+```
+#### assert_success
+
+`assert::binaryExists` will return `0` when the binary can be retrieved. The function will run in silent (no output).
+
+```bats
+@test "Assert binary exists" {
+    run assert::binaryExists "clear" # clear is a native Linux command
+    assert_output ""                 # No output when success
+    assert_success
+}
+```
+
+```bash
+function assert::binaryExists() {
+    local binary="${1}"
+    local msg="${2:-${FUNCNAME[0]} - File \"$binary\" did not exists}"
+
+    [[ -z "$(which "$binary" || true)" ]] && echo "$msg" && exit 1
+
+    return 0
+}
+```
+
+
+#### Check for ANSI colors
+
+Imagine the following code:
+
+```bash
+__RED=31
+function console::printRed() {
+    for line in "$@"; do
+        printf "\e[1;${__REd}m%s\e[0m\n" "$line"
+    done
+}
+```
+
+We wish to check that the line will be echoed in red.
+
+```bats
+@test "console::printRed - The sentence should be displayed" {
+    run console::printRed "This line should be echoed in Red"
+    assert_output "[1;31mThis line should be echoed in Red[0m"
+    assert_success
+}
+```
+
+#### Check for multi-lines output
+
+Imagine the following code:
+
+```bash
+function console::banner() {
+    printf "%s\n" "============================================"
+    printf "= %-40s =\n" "$@"
+    printf "%s\n" "============================================"
+}
+```
+
+This will write three lines on the console, like f.i. 
+
+```text
+# ============================================
+# = Step 1 - Initialization                  =
+# ============================================
+```
+
+To check for multi-lines, use the `$lines` array like this:
+
+```bats
+@test "console::banner - The sentence should be displayed" {
+    run console::banner "Step 1 - Initialization"
+    assert_equal "${lines[0]}" "============================================"
+    assert_equal "${lines[1]}" "= Step 1 - Initialization                  ="
+    assert_equal "${lines[2]}" "============================================"
+    assert_success
+}
+```
+
+#### Check against a file
+
+Imagine a function that will parse a file and f.i. remove some paragraphs. We need to check if the content is correct, once the function has been fired.
+
+For this, imagine a `removeTopOfFileComments` function. The function will parse the file and remove the HTML comments (`<!-- ... -->`) present at the top of the file.
+
+For the test, we'll create a file with three empty lines, then a HTML comment block, then two empty lines, then the HTML code. So, by removing the HTML comment, we'll have five empty lines followed by the HTML block so, we need to check our file contains six lines.
+
+The tip used is:
+
+* `cat --show-ends --show-tabs "$tempfile"` i.e. get the content of the file but with `$` where we've a linefeed and, here, also `^I` for tabs.
+* then we'll pipe the result with `tr "\n" "#"` so, instead of getting six lines, we'll get only one by replacing linefeed by `#`.
+
+Now, bingo, since we've a variable with only one line (in our example: `$#$#$#$#$#<html><body/></html>$#`), we can compare with our expectation:
+
+```bats
+@test "html::removeTopOfFileComments - remove HTML comments - with empty lines" {
+    tempfile="$(mktemp)"
+    
+    # Here, we'll have extra, empty, lines. They should be removed too
+    echo '' >$tempfile
+    echo '' >>$tempfile
+    echo '' >>$tempfile
+    echo '<!--  ' >>$tempfile # We also add extra spaces before the start tag
+    echo '   Lorem ipsum dolor sit amet, consectetur adipiscing elit.' >>$tempfile
+    echo '   Morbi interdum elit a nisi facilisis pulvinar.' >>$tempfile
+    echo '   Vestibulum fermentum consequat suscipit. Vestibulum id sapien metus.' >>$tempfile
+    echo '-->     ' >>$tempfile # We also add extra spaces after the end tag
+    echo '' >>$tempfile
+    echo '' >>$tempfile
+    echo '<html><body/></html>' >>$tempfile
+
+    run html::removeTopOfFileComments "$tempfile"
+
+    # Get now the content of the file
+    #   We expect three empty lines (the three first)
+    #       The HTML comment has been remove
+    #   Then there are two more empty line (so we'll five empty lines)
+    #   And we'll have our "<html><body/></html>" block.
+    #
+    #   cat --show-ends --show-tabs will show the dollar sign (end-of-line) and f.i. ^I for tabulations
+    #   tr "\n" "#" will then convert the linefeed character to a diese so, in fact, fileContent will
+    #   be a string like `$#$#$#$#$#<html><body/></html>$#`
+    fileContent="$(cat --show-ends --show-tabs "$tempfile" | tr "\n" "#")"
+
+    # Once we've our string, compare the fileContent with our expectation
+    assert_equal "$fileContent" "\$#\$#\$#\$#\$#<html><body/></html>\$#"
+}
+```
+
+## Some special functions
+
+### setup
+
+The setup function is called before running a test. For each `@test` function present in the scenario, the `setup()` function will be called.
+
+In the following example, since there are two test functions, `setup()` will be called twice.
+
+```bats
+setup() {
+    load 'test_helper/bats-support/load'
+    load 'test_helper/bats-assert/load'
+
+    ENV_ROOT_DIR=""
+
+    source 'src/env.sh'
+}
+
+@test "env::assertFileExists - Assert .env file exists - The path isn't initialized" {
+    run env::assertFileExists
+    assert_failure
+}
+
+@test "env::assertFileExists - Assert .env file exists - The file exists" {
+    ENV_ROOT_DIR="/tmp"
+    ENV_FILENAME=".env.bats.testing"
+    touch ${ENV_ROOT_DIR}/${ENV_FILENAME}
+    run env::assertFileExists
+    assert_success
+}
+```
+
+### teardown
+
+Just like `setup`, the `teardown` function will be called for each tests but once the test has been fired. This is the good place for, f.i., removing some files created during the execution of a test.
+
+```bats
+teardown() {
+    rm -f /tmp/bats
+}
+```
+
 ## Run the tests
 
 The binary to use is `./test/bats/bin/bats` and we need to specify where our tests are stored (in our case, in the `test` folder). To run all `.bats` file present in the folder:
@@ -198,6 +417,9 @@ And we'll get this:
 2 tests, 0 failures
 ```
 
+You can find another example of how to mock a function here:
+
+* [assert_failure](#assert_failure)
 
 ## Special cases
 
