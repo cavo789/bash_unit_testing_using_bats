@@ -483,3 +483,16 @@ If a test should always fail (for instance because it's not yet correctly coded)
 * [https://github.com/bats-core](https://github.com/bats-core)
 * [https://github.com/dodie/testing-in-bash](https://github.com/dodie/testing-in-bash)
 * [https://marck-oemar.medium.com/unusual-unit-testing-part-1-bash-scripts-with-bats-55ac78e61491](https://marck-oemar.medium.com/unusual-unit-testing-part-1-bash-scripts-with-bats-55ac78e61491) / [https://github.com/marck-oemar/unittesting](https://github.com/marck-oemar/unittesting)
+
+## Debuging
+
+* Make sure to always return a value like `return 0` in each function
+* Sometimes we need to use a syntax like below to not run an instruction while the file is being tested by Bats. Another example is adding a `trap`, it seems Bats didn't like that. 
+
+```bash
+[[ "$(basename "${0}")" != "bats-exec-test" ]] && concat::__main $*
+```
+
+```bash
+[[ "$(basename "${0}")" != "bats-exec-test" ]] && trap log::__logDestruct EXIT
+```
