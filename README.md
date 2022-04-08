@@ -311,6 +311,15 @@ setup() {
 }
 ```
 
+#### Check that a value is NOT in a file
+
+Another use of the `assert_failure` can be to start a command like a grep and expect to get an error:
+
+```bash
+run grep "REGEX_SOMETHING_THAT_SHOULD_BE_MISSING" "/tmp/test.log"
+assert_failure 1
+```
+
 ## Some special functions
 
 ### setup
