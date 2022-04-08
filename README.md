@@ -270,6 +270,47 @@ Now, bingo, since we've a variable with only one line (in our example: `$#$#$#$#
 }
 ```
 
+#### Check against a file using a regex
+
+A second scenario can be: you have a `write` function (think to a logfile) and you want to check the presence of a given line in the file.
+
+The example below relies on [bats-file](https://github.com/ztombol/bats-file) and his `assert_file_contains` method.  That method ask for a filename and a regex pattern.
+
+```bash
+setup() {
+    load 'test_helper/bats-support/load'
+    load 'test_helper/bats-assert/load'
+    load 'test_helper/bats-file/load'
+
+    #! "grep" without the "-P" argument seems to not support repetition like "\d{4}"
+    #
+    # a date like `2022-04-07`
+    regexDate="[0-9][0-9][0-9][0-9]\-[0-9][0-9]\-[0-9][0-9]"
+    # a time like `17:41:22`
+    regexTime="[0-9][0-9]\:[0-9][0-9]\:[0-9][0-9]"
+    # a timezone difference like "0200"
+    regexUTC="[0-9]*" #! Should be [0-9][0-9][0-9][0-9] but didn't work???
+
+    # The final pattern so we can match f.i. `[2022-04-07T18:00:20+0200] `
+    __DATE_PATTERN="\[${regexDate}\T${regexTime}\+${regexUTC}.*\]\s"
+
+    return 0
+}
+
+
+@test "log::write - Write a line in the log" {
+    local sentence=""
+    sentence="This is my important message"
+    run write "${sentence}"
+
+    assert_file_exist "/tmp/bats_log.tmp"
+
+    echo "${__DATE_PATTERN}${sentence}" >/tmp/regex.tmp
+    assert_file_contains "/tmp/bats_log.tmp" "${__DATE_PATTERN}${sentence}"
+    assert_success
+}
+```
+
 ## Some special functions
 
 ### setup
