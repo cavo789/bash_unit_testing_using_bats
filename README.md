@@ -141,6 +141,32 @@ function assert::binaryExists() {
     return 0
 }
 ```
+#### assert_output
+
+`assert_output` has two nice options: `--partial` and `--regexp`.
+
+Using `--partial` will allow f.i. the check if the output contains some raw text like, for a help screen, a given sentence.
+
+```bats
+@test "Show the help screen" {
+    source 'src/decktape/decktape.sh'
+    arrArguments=("--help")
+    run decktape::__showHelp ${arrArguments[@]}
+    assert_output --partial "Convert a revealJs slideshow to a PDF document"
+}
+```
+
+Using `--regexp` will allow to use a regular expression:
+
+```bats
+@test "Show the help screen" {
+    source 'src/decktape/decktape.sh'
+    arrArguments=("--input InvalidFile")
+    run decktape::__process ${arrArguments[@]}
+    assert_output --regexp "ERROR - The input file .* doesn't exists."
+}
+```
+
 #### assert_success
 
 `assert::binaryExists` will return `0` when the binary can be retrieved. The function will run in silent (no output).
